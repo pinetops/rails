@@ -1,6 +1,7 @@
 require "pathname"
 require "active_support/core_ext/class"
 require "action_view/template"
+require "thread"
 
 module ActionView
   # = Action View Resolver
@@ -33,10 +34,13 @@ module ActionView
     def initialize
       @cached = Hash.new { |h1,k1| h1[k1] = Hash.new { |h2,k2|
         h2[k2] = Hash.new { |h3,k3| h3[k3] = Hash.new { |h4,k4| h4[k4] = {} } } } }
+      @cached_mutex = Monitor.new
     end
 
     def clear_cache
-      @cached.clear
+      @cached_mutex.synchronize {
+        @cached.clear
+      }
     end
 
     # Normalizes the arguments and passes it on to find_template.
@@ -71,12 +75,16 @@ module ActionView
       locals = sort_locals(locals)
 
       if key && caching?
-        @cached[key][name][prefix][partial][locals] ||= decorate(yield, path_info, details, locals)
+        @cached.synchronize {
+          @cached[key][name][prefix][partial][locals] ||= decorate(yield, path_info, details, locals)
+        }
       else
         fresh = decorate(yield, path_info, details, locals)
         return fresh unless key
 
-        scope = @cached[key][name][prefix][partial]
+        @cached.synchronize {
+          scope = @cached[key][name][prefix][partial]
+        }
         cache = scope[locals]
         mtime = cache && cache.map(&:updated_at).max
 
