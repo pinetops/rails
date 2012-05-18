@@ -2,6 +2,7 @@ require 'active_support/core_ext/array/wrap'
 require 'active_support/core_ext/object/blank'
 require 'active_support/core_ext/object/try'
 require 'active_support/core_ext/kernel/singleton_class'
+require 'thread'
 
 if defined?(RUBY_ENGINE) && RUBY_ENGINE == 'ruby' && RUBY_VERSION == '1.9.3' && RUBY_PATCHLEVEL == 0
   # This is a hack to work around a bug in Ruby 1.9.3p0:
@@ -151,6 +152,7 @@ module ActionView
       @virtual_path      = details[:virtual_path]
       @updated_at        = details[:updated_at] || Time.now
       @formats = Array.wrap(format).map { |f| f.is_a?(Mime::Type) ? f.ref : f }
+      @compile_mutex     = Monitor.new
     end
 
     # Returns if the underlying handler supports streaming. If so,
@@ -208,18 +210,20 @@ module ActionView
       def compile!(view) #:nodoc:
         return if @compiled
 
-        if view.is_a?(ActionView::CompiledTemplates)
-          mod = ActionView::CompiledTemplates
-        else
-          mod = view.singleton_class
-        end
+	@compile_mutex.synchronize {
+          if view.is_a?(ActionView::CompiledTemplates)
+            mod = ActionView::CompiledTemplates
+          else
+            mod = view.singleton_class
+          end
 
-        compile(view, mod)
+          compile(view, mod)
 
-        # Just discard the source if we have a virtual path. This
-        # means we can get the template back.
-        @source = nil if @virtual_path
-        @compiled = true
+          # Just discard the source if we have a virtual path. This
+          # means we can get the template back.
+          @source = nil if @virtual_path
+          @compiled = true
+        }
       end
 
       # Among other things, this method is responsible for properly setting
