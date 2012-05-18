@@ -75,14 +75,14 @@ module ActionView
       locals = sort_locals(locals)
 
       if key && caching?
-        @cached.synchronize {
+        @cached_mutex.synchronize {
           @cached[key][name][prefix][partial][locals] ||= decorate(yield, path_info, details, locals)
         }
       else
         fresh = decorate(yield, path_info, details, locals)
         return fresh unless key
 
-        @cached.synchronize {
+        @cached_mutex.synchronize {
           scope = @cached[key][name][prefix][partial]
         }
         cache = scope[locals]
