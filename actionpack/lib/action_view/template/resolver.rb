@@ -74,25 +74,24 @@ module ActionView
       name, prefix, partial = path_info
       locals = sort_locals(locals)
 
-      if key && caching?
-        @cached_mutex.synchronize {
+      @cached_mutex.synchronize {
+        if key && caching?
           @cached[key][name][prefix][partial][locals] ||= decorate(yield, path_info, details, locals)
-        }
-      else
-        fresh = decorate(yield, path_info, details, locals)
-        return fresh unless key
-
-        @cached_mutex.synchronize {
-          scope = @cached[key][name][prefix][partial]
-        }
-        cache = scope[locals]
-        mtime = cache && cache.map(&:updated_at).max
-
-        if !mtime || fresh.empty?  || fresh.any? { |t| t.updated_at > mtime }
-          scope[locals] = fresh
         else
-          cache
-        end
+          fresh = decorate(yield, path_info, details, locals)
+          return fresh unless key
+
+          scope = @cached[key][name][prefix][partial]
+
+          cache = scope[locals]
+          mtime = cache && cache.map(&:updated_at).max
+
+          if !mtime || fresh.empty?  || fresh.any? { |t| t.updated_at > mtime }
+            scope[locals] = fresh
+          else
+            cache
+          end
+        }
       end
     end
 
