@@ -91,8 +91,8 @@ module ActionView
           else
             cache
           end
-        }
-      end
+        end
+      }
     end
 
     # Ensures all the resolver information is set in the template.
